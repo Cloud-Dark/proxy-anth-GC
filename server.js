@@ -26,8 +26,18 @@ const GC_API_KEY = process.env.GC_API_KEY || '';
 // Upstream Anthropic-compatible GrowthCircle.
 const UPSTREAM = process.env.GC_BASE_URL || 'https://ai.growthcircle.id/anthropic';
 
-// Model GrowthCircle default untuk semua request claude-*.
+// Model fallback default (mis. saat client tidak kirim model).
 const DEFAULT_MODEL = process.env.GC_MODEL || 'gpt-5.4-free';
+
+// Remap per-tier untuk nama model Claude (yang dikirim Claude Desktop di picker utama).
+// Key Free tidak punya akses Claude asli, jadi tiap tier diarahkan ke model free berbeda.
+// Bisa dioverride lewat env. Set REMAP=0 untuk mematikan remap (semua model diteruskan apa adanya).
+const REMAP = process.env.REMAP !== '0';
+const CLAUDE_TIER_MAP = {
+  opus: process.env.GC_MODEL_OPUS || 'gpt-5.5-free',
+  sonnet: process.env.GC_MODEL_SONNET || 'gpt-5.4-free',
+  haiku: process.env.GC_MODEL_HAIKU || 'gpt-5.4-mini-free',
+};
 
 // Model teks/chat yang dipublikasikan ke client lewat /v1/models.
 // Hanya model yang bisa dipakai lewat Messages API (chat) yang dimasukkan;
@@ -80,9 +90,15 @@ const ADVERTISED_MODELS = [
 
 function remapModel(model) {
   if (typeof model !== 'string' || model.length === 0) return DEFAULT_MODEL;
-  // Nama model Claude (dikirim Claude Desktop/Code) selalu diarahkan ke model GC.
-  if (model.startsWith('claude')) return DEFAULT_MODEL;
-  return model; // model GC eksplisit diteruskan apa adanya.
+  if (!REMAP) return model; // remap dimatikan -> teruskan apa adanya.
+  // Hanya nama model Claude (default picker Claude Desktop) yang diremap per-tier.
+  if (model.startsWith('claude')) {
+    if (model.includes('opus')) return CLAUDE_TIER_MAP.opus;
+    if (model.includes('haiku')) return CLAUDE_TIER_MAP.haiku;
+    if (model.includes('sonnet')) return CLAUDE_TIER_MAP.sonnet;
+    return DEFAULT_MODEL;
+  }
+  return model; // model lain (mis. yang kamu pilih dari daftar) diteruskan apa adanya.
 }
 
 // Olah body request: remap model + kumpulkan info untuk logging.
@@ -277,7 +293,12 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, HOST, () => {
   console.log(`GrowthCircle Anthropic proxy aktif di http://${HOST}:${PORT}`);
   console.log(`  upstream : ${UPSTREAM}`);
-  console.log(`  model    : ${DEFAULT_MODEL} (semua claude-* diarahkan ke sini)`);
+  if (REMAP) {
+    console.log(`  remap    : opus→${CLAUDE_TIER_MAP.opus}  sonnet→${CLAUDE_TIER_MAP.sonnet}  haiku→${CLAUDE_TIER_MAP.haiku}`);
+    console.log(`             model lain (mis. pilihan dari daftar) diteruskan apa adanya. Set REMAP=0 untuk matikan.`);
+  } else {
+    console.log(`  remap    : OFF (semua model diteruskan apa adanya)`);
+  }
   console.log(`  logging  : ${LOG ? 'ON' : 'OFF'} (set LOG=0 untuk mematikan)`);
   console.log(`  set ANTHROPIC_BASE_URL=http://${HOST}:${PORT} di client kamu.`);
 });

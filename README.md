@@ -58,7 +58,11 @@ Semua opsional. Set sebelum menjalankan `node server.js`.
 | `HOST` | `127.0.0.1` | Host bind |
 | `GC_API_KEY` | `(kosong)` | Key default/fallback. Kosong = key wajib dikirim client |
 | `GC_BASE_URL` | `https://ai.growthcircle.id/anthropic` | Upstream GrowthCircle |
-| `GC_MODEL` | `gpt-5.4-free` | Model tujuan untuk semua request `claude-*` |
+| `GC_MODEL` | `gpt-5.4-free` | Model fallback default (saat client tak kirim model) |
+| `REMAP` | `1` | Remap nama `claude-*` ke model free. Set `0` agar semua model diteruskan apa adanya |
+| `GC_MODEL_OPUS` | `gpt-5.5-free` | Target remap untuk `claude-opus-*` |
+| `GC_MODEL_SONNET` | `gpt-5.4-free` | Target remap untuk `claude-sonnet-*` |
+| `GC_MODEL_HAIKU` | `gpt-5.4-mini-free` | Target remap untuk `claude-haiku-*` |
 | `LOG` | `1` | Log alur request/response ke terminal. Set `0` untuk mematikan |
 
 ### Contoh tampilan log di terminal
