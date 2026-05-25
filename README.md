@@ -59,6 +59,21 @@ Semua opsional. Set sebelum menjalankan `node server.js`.
 | `GC_API_KEY` | `(kosong)` | Key default/fallback. Kosong = key wajib dikirim client |
 | `GC_BASE_URL` | `https://ai.growthcircle.id/anthropic` | Upstream GrowthCircle |
 | `GC_MODEL` | `gpt-5.4-free` | Model tujuan untuk semua request `claude-*` |
+| `LOG` | `1` | Log alur request/response ke terminal. Set `0` untuk mematikan |
+
+### Contoh tampilan log di terminal
+
+```
+[09:47:43.691] → POST /v1/messages
+           model: claude-opus-4-7 → gpt-5.4-free  key: gc-free…8KUD  stream: no
+           prompt: Sebutkan 1 fakta singkat tentang laut
+[09:47:45.877] ← 200 (2186ms, 476B)
+           reply: Laut menutupi sekitar 71% permukaan Bumi.
+```
+
+Tiap request menampilkan model (asli → hasil remap), key (disamarkan), mode stream,
+preview prompt, lalu status + waktu + preview balasan. Untuk request streaming, isi
+balasan tidak di-preview (ditandai `[stream]`).
 
 Contoh set env var:
 

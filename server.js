@@ -16,6 +16,9 @@ const { URL } = require('url');
 const PORT = parseInt(process.env.PORT || '8787', 10);
 const HOST = process.env.HOST || '127.0.0.1';
 
+// Logging alur data ke terminal. Set LOG=0 untuk mematikan.
+const LOG = process.env.LOG !== '0';
+
 // API key GrowthCircle default (fallback). Kosong = wajib dikirim client.
 // Bisa diisi lewat env GC_API_KEY kalau mau ada default.
 const GC_API_KEY = process.env.GC_API_KEY || '';
@@ -82,18 +85,59 @@ function remapModel(model) {
   return model; // model GC eksplisit diteruskan apa adanya.
 }
 
-function rewriteBody(raw) {
-  if (!raw || raw.length === 0) return raw;
+// Olah body request: remap model + kumpulkan info untuk logging.
+function prepareBody(raw) {
+  const info = { from: null, to: null, stream: false, preview: null };
+  if (!raw || raw.length === 0) return { buffer: raw, info };
   let parsed;
   try {
     parsed = JSON.parse(raw.toString('utf8'));
   } catch {
-    return raw; // bukan JSON, teruskan mentah.
+    return { buffer: raw, info }; // bukan JSON, teruskan mentah.
   }
-  if (parsed && typeof parsed === 'object' && 'model' in parsed) {
-    parsed.model = remapModel(parsed.model);
+  if (parsed && typeof parsed === 'object') {
+    if ('model' in parsed) {
+      info.from = parsed.model;
+      parsed.model = remapModel(parsed.model);
+      info.to = parsed.model;
+    }
+    info.stream = parsed.stream === true;
+    // Ambil pesan user terakhir untuk preview.
+    if (Array.isArray(parsed.messages)) {
+      const last = [...parsed.messages].reverse().find((m) => m && m.role === 'user');
+      if (last) {
+        info.preview = typeof last.content === 'string'
+          ? last.content
+          : Array.isArray(last.content)
+            ? last.content.map((p) => (p && p.type === 'text' ? p.text : `[${p && p.type}]`)).join(' ')
+            : null;
+      }
+    }
   }
-  return Buffer.from(JSON.stringify(parsed), 'utf8');
+  return { buffer: Buffer.from(JSON.stringify(parsed), 'utf8'), info };
+}
+
+// ---- util logging ----
+function ts() { return new Date().toISOString().slice(11, 23); }
+function maskKey(k) {
+  if (!k) return '(none)';
+  return k.length <= 8 ? k : `${k.slice(0, 7)}…${k.slice(-4)}`;
+}
+function truncate(s, n) {
+  if (!s) return '';
+  s = String(s).replace(/\s+/g, ' ').trim();
+  return s.length > n ? s.slice(0, n) + '…' : s;
+}
+// Ambil teks dari respons Anthropic (non-stream) untuk preview.
+function previewResponse(buf) {
+  try {
+    const j = JSON.parse(buf.toString('utf8'));
+    if (j.content && Array.isArray(j.content)) {
+      return j.content.map((c) => (c && c.type === 'text' ? c.text : `[${c && c.type}]`)).join(' ');
+    }
+    if (j.error) return `ERROR ${j.error.code || j.error.type || ''}: ${j.error.message || ''}`;
+  } catch { /* abaikan */ }
+  return null;
 }
 
 const upstreamUrl = new URL(UPSTREAM);
@@ -162,7 +206,15 @@ const server = http.createServer((req, res) => {
   const chunks = [];
   req.on('data', (c) => chunks.push(c));
   req.on('end', () => {
-    const body = rewriteBody(Buffer.concat(chunks));
+    const { buffer: body, info } = prepareBody(Buffer.concat(chunks));
+    const started = Date.now();
+
+    if (LOG) {
+      const model = info.from ? (info.from === info.to ? info.from : `${info.from} → ${info.to}`) : '-';
+      console.log(`\n[${ts()}] → ${req.method} ${req.url}`);
+      console.log(`           model: ${model}  key: ${maskKey(apiKey)}  stream: ${info.stream ? 'yes' : 'no'}`);
+      if (info.preview) console.log(`           prompt: ${truncate(info.preview, 200)}`);
+    }
 
     const headers = { ...req.headers };
     // Header yang harus diatur ulang oleh proxy.
@@ -190,10 +242,29 @@ const server = http.createServer((req, res) => {
     const transport = upstreamUrl.protocol === 'https:' ? https : http;
     const proxyReq = transport.request(options, (proxyRes) => {
       res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
-      proxyRes.pipe(res); // pipe langsung -> streaming SSE jalan otomatis.
+
+      if (!LOG) {
+        proxyRes.pipe(res); // tanpa log -> pipe langsung.
+        return;
+      }
+
+      // Dengan log: tee respons supaya bisa dicatat tanpa ganggu streaming.
+      const respChunks = [];
+      proxyRes.on('data', (c) => { respChunks.push(c); res.write(c); });
+      proxyRes.on('end', () => {
+        res.end();
+        const ms = Date.now() - started;
+        const buf = Buffer.concat(respChunks);
+        const status = proxyRes.statusCode || 0;
+        console.log(`[${ts()}] ← ${status} (${ms}ms, ${buf.length}B)${info.stream ? ' [stream]' : ''}`);
+        const preview = info.stream ? null : previewResponse(buf);
+        if (preview) console.log(`           reply: ${truncate(preview, 200)}`);
+        else if (status >= 400) console.log(`           body: ${truncate(buf.toString('utf8'), 200)}`);
+      });
     });
 
     proxyReq.on('error', (err) => {
+      if (LOG) console.log(`[${ts()}] ← proxy_error: ${err.message}`);
       res.writeHead(502, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: { type: 'proxy_error', message: err.message } }));
     });
@@ -207,5 +278,6 @@ server.listen(PORT, HOST, () => {
   console.log(`GrowthCircle Anthropic proxy aktif di http://${HOST}:${PORT}`);
   console.log(`  upstream : ${UPSTREAM}`);
   console.log(`  model    : ${DEFAULT_MODEL} (semua claude-* diarahkan ke sini)`);
+  console.log(`  logging  : ${LOG ? 'ON' : 'OFF'} (set LOG=0 untuk mematikan)`);
   console.log(`  set ANTHROPIC_BASE_URL=http://${HOST}:${PORT} di client kamu.`);
 });
