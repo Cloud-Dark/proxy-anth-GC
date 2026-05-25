@@ -1,0 +1,14 @@
+{
+  "name": "proxy-anth-gc",
+  "version": "1.0.0",
+  "description": "Proxy Anthropic-compatible untuk GrowthCircle (tanpa dependency)",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "license": "MIT"
+}
