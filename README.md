@@ -148,8 +148,10 @@ Kalau tidak ada key sama sekali, proxy balas `401`. Tidak ada key yang di-hardco
 - **Remap model:** nama `claude-*` (yang dikirim Claude Desktop/CLI) otomatis diubah ke
   `GC_MODEL` (default `gpt-5.4-free`), karena key Free tidak punya akses model Claude asli.
   Model non-`claude-*` diteruskan apa adanya.
-- **`/v1/models`:** dijawab lokal dengan katalog model Claude supaya client menampilkannya
-  sebagai model modern (bukan "legacy"). Request tetap diremap saat dipakai.
+- **`/v1/models`:** dijawab lokal dengan katalog model teks/chat GrowthCircle (OpenAI,
+  Anthropic, Gemini, MiniMax, DeepSeek, GLM, Kimi) supaya client menampilkannya sebagai
+  model modern (bukan "legacy"). Daftar lengkap semua model ada di [MODELS.md](MODELS.md).
+  Model image/video/audio tidak ditampilkan karena tidak jalan lewat Messages API.
 - **Normalisasi `/v1` dobel:** base URL yang berakhiran `/v1` (jadi `/v1/v1/...`) diperbaiki otomatis.
 - **Streaming:** `"stream": true` didukung; respons SSE diteruskan apa adanya.
 

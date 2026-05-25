@@ -26,14 +26,53 @@ const UPSTREAM = process.env.GC_BASE_URL || 'https://ai.growthcircle.id/anthropi
 // Model GrowthCircle default untuk semua request claude-*.
 const DEFAULT_MODEL = process.env.GC_MODEL || 'gpt-5.4-free';
 
-// Katalog model Claude yang dipublikasikan ke client lewat /v1/models.
-// Claude Desktop pakai daftar ini untuk menampilkan model modern (bukan "legacy").
-// Saat dipakai, request tetap diremap ke DEFAULT_MODEL untuk key Free.
+// Model teks/chat yang dipublikasikan ke client lewat /v1/models.
+// Hanya model yang bisa dipakai lewat Messages API (chat) yang dimasukkan;
+// model image/video/audio pakai endpoint lain, jadi tidak ditampilkan di picker.
+// Daftar lengkap semua model GrowthCircle ada di MODELS.md.
 const ADVERTISED_MODELS = [
+  // OpenAI
+  'gpt-5.4', 'gpt-5.4-free',
+  'gpt-5.5', 'gpt-5.5-free',
+  'gpt-5.4-mini', 'gpt-5.4-mini-free',
+  'gpt-5.3-codex', 'gpt-5.3-codex-free',
+  'gpt-5.3-codex-spark', 'gpt-5.3-codex-spark-free',
+  // Anthropic
   'claude-opus-4-7',
   'claude-opus-4-6',
+  'claude-opus-4-6-thinking',
+  'claude-opus-4-5-20251101',
+  'claude-opus-4-5-20251101-thinking',
   'claude-sonnet-4-6',
+  'claude-sonnet-4-6-thinking',
+  'claude-sonnet-4-5-20250929',
+  'claude-sonnet-4-5-20250929-thinking',
   'claude-haiku-4-5-20251001',
+  'claude-haiku-4-5-20251001-thinking',
+  'claude-3-5-haiku-latest',
+  // Google Gemini
+  'gemini-3.1-pro-preview', 'gemini-3.1-pro-preview-thinking',
+  'gemini-3-pro-preview', 'gemini-3-pro-preview-thinking',
+  'gemini-3-flash-preview', 'gemini-3-flash-preview-thinking', 'gemini-3-flash-preview-nothinking',
+  'gemini-3.5-flash',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-2.5-pro', 'gemini-2.5-pro-thinking', 'gemini-2.5-pro-nothinking',
+  'gemini-2.5-flash', 'gemini-2.5-flash-thinking', 'gemini-2.5-flash-nothinking',
+  'gemini-2.5-flash-lite',
+  'gemini-2.0-flash',
+  // MiniMax
+  'MiniMax-M2.7', 'MiniMax-M2.7-free',
+  'MiniMax-M2.7-highspeed', 'MiniMax-M2.7-highspeed-free',
+  'minimax-m2.1', 'minimax-m2.5',
+  // DeepSeek
+  'deepseek-r1-0528', 'deepseek-r1-250528',
+  'deepseek-v3-0324', 'deepseek-v3.1-terminus',
+  'deepseek-v3.2', 'deepseek-v3.2-exp',
+  'deepseek-v4-flash', 'deepseek-v4-pro',
+  // Zhipu GLM
+  'glm-4.6', 'glm-4.7', 'glm-5', 'glm-5.1',
+  // Moonshot Kimi
+  'kimi-k2-instruct', 'kimi-k2-thinking', 'kimi-k2.5',
 ];
 
 function remapModel(model) {
